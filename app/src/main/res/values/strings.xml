@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">VKNews</string>
+
+    <string name="hello_world">Hello world!</string>
+    <string name="action_logout">Lout/Lin</string>
+    <string name="likes">Likes:</string>
+</resources>
