@@ -38,22 +38,6 @@ public class CommentsPresenter implements ICommentsPresenter, IOwnerPresenter {
     private IView<VKNews> view;
     private JSONArray profiles;
     private JSONArray groups;
-    private Observer<VKNews> observer = new Observer<VKNews>() {
-        @Override
-        public void onCompleted() {
-
-        }
-
-        @Override
-        public void onError(Throwable e) {
-
-        }
-
-        @Override
-        public void onNext(VKNews news) {
-
-        }
-    };
 
     public CommentsPresenter(Fragment fragment, IView<VKNews> view) {
         this.fragment = fragment;
@@ -122,6 +106,17 @@ public class CommentsPresenter implements ICommentsPresenter, IOwnerPresenter {
     @Override
     public void regListener(IView listener) {
         this.view = listener;
+    }
+
+    @Override
+    public IView<VKNews> getListener() {
+        return this.view;
+    }
+
+    @Override
+    public void removeListener(IView<VKNews> listener) {
+        if (this.view!=null)
+            this.view = null;
     }
 
     @Override

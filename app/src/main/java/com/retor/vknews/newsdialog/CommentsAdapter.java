@@ -3,7 +3,6 @@ package com.retor.vknews.newsdialog;
 import android.content.Context;
 import android.net.Uri;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -35,12 +34,14 @@ public class CommentsAdapter extends RecyclerView.Adapter<MViewHolder> {
     private Map<VKApiComment, Object> comments = new HashMap<>();
     private Set<VKApiComment> items = new HashSet<>();
     private Context context;
+    private Picasso picasso;
 
     public CommentsAdapter(Context context, Map<VKApiComment, Object> items) {
         this.context = context;
-//        this.activity = activity;
         this.comments.putAll(items);
-//        Collections.reverse(this.items);
+        this.picasso = new Picasso.Builder(context)
+                .memoryCache(new com.squareup.picasso.LruCache(12000))
+                .build();
     }
 
     public void setItems(Map<VKApiComment, Object> items) {
@@ -83,34 +84,38 @@ public class CommentsAdapter extends RecyclerView.Adapter<MViewHolder> {
             Object owner = comments.get(tmp);
             if (owner instanceof VKApiUser) {
                 holder.getAuthor().setText(((VKApiUser) owner).first_name + " " + ((VKApiUser) owner).first_name);
-                Picasso.with(context).load(Uri.parse(((VKApiUser) owner).photo_100)).into(holder.getPhoto());
+                picasso.load(Uri.parse(((VKApiUser) owner).photo_100)).error(R.drawable.no_image).into(holder.getPhoto());
             } else if (owner instanceof VKApiCommunity) {
                 holder.getAuthor().setText(((VKApiCommunity) owner).name + " " + ((VKApiCommunity) owner).screen_name);
-                Picasso.with(context).load(Uri.parse(((VKApiCommunity) owner).photo_100)).into(holder.getPhoto());
+                picasso.load(Uri.parse(((VKApiCommunity) owner).photo_100)).error(R.drawable.no_image).into(holder.getPhoto());
             }
         }
     }
 
     private void attachmentFill(MViewHolder holder, VKAttachments attachments) {
         for (VKAttachments.VKApiAttachment attachment : attachments) {
-            Log.d("Attachments type", attachment.getType());
+//            Log.d("Attachments type", attachment.getType());
             if (attachment.getType().equals("photo")) {
-                ImageView img = new ImageView(context);
-                Picasso.with(context).load(Uri.parse(((VKApiPhoto) attachment).photo_604)).into(img);
-                holder.getContent().addView(img);
-                holder.getContent().setScrollContainer(true);
+                photoAttachment(holder, (VKApiPhoto) attachment);
             }
             if (attachment.getType().equals("doc")) {
-                TextView textView = new TextView(context);
-                textView.setText(((VKApiDocument) attachment).title + " " + ((VKApiDocument) attachment).url);
-                holder.getContent().addView(textView);
-                holder.getContent().setScrollContainer(true);
+                docAttachment(holder, (VKApiDocument) attachment);
             }
         }
     }
 
-    public void clear() {
-        items.clear();
+    private void photoAttachment(MViewHolder holder, VKApiPhoto attachment) {
+        ImageView img = new ImageView(context);
+        picasso.load(Uri.parse(attachment.photo_604)).error(R.drawable.no_image).into(img);
+        holder.getContent().addView(img);
+        holder.getContent().setScrollContainer(true);
+    }
+
+    private void docAttachment(MViewHolder holder, VKApiDocument attachment) {
+        TextView textView = new TextView(context);
+        textView.setText(attachment.title + " " + attachment.url);
+        holder.getContent().addView(textView);
+        holder.getContent().setScrollContainer(true);
     }
 
     @Override

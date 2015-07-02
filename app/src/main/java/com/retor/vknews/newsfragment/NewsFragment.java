@@ -14,6 +14,7 @@ import android.view.ViewGroup;
 
 import com.retor.vklib.DialogsBuilder;
 import com.retor.vknews.R;
+import com.retor.vknews.presenters.CacheTest;
 import com.retor.vknews.presenters.INewsPresenter;
 import com.retor.vknews.presenters.IView;
 import com.retor.vknews.presenters.VKNews;
@@ -37,7 +38,8 @@ public class NewsFragment extends Fragment implements IView<VKNews> {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
-        this.presenter = new NewsPresenter(this, this);
+        this.presenter = new CacheTest(this, this);
+//        this.presenter = new NewsPresenter(this, this);
     }
 
     @Nullable

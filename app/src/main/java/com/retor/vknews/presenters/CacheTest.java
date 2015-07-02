@@ -1,17 +1,14 @@
-package com.retor.vknews.newsfragment;
+package com.retor.vknews.presenters;
 
 import android.app.Activity;
+import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
+import android.support.v4.util.LruCache;
 
-import com.retor.vklib.Const;
 import com.retor.vklib.DialogsBuilder;
 import com.retor.vklib.VkApiPlus;
 import com.retor.vklib.mod.VKApiNewsArray;
 import com.retor.vklib.mod.VkNewsPost;
-import com.retor.vknews.presenters.INewsPresenter;
-import com.retor.vknews.presenters.IView;
-import com.retor.vknews.presenters.VKNews;
 import com.vk.sdk.api.VKApiConst;
 import com.vk.sdk.api.VKError;
 import com.vk.sdk.api.VKParameters;
@@ -31,20 +28,24 @@ import rx.Observer;
 import rx.Subscriber;
 import rx.android.app.AppObservable;
 import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
 /**
- * Created by retor on 22.06.2015.
+ * Created by retor on 02.07.2015.
  */
-public class NewsPresenter implements INewsPresenter {
-    private Activity activity;
-    private Fragment fragment;
-    private IView<VKNews> view;
+public class CacheTest implements INewsPresenter{
 
+    private IView<VKNews> view;
+    private Fragment fragment;
+    private Activity activity;
+    private LruCache<Integer, VKNews> cache;
+    private int pos = 0;
+    private int prev_pos = 0;
     private Observer<VKNews> observer = new Observer<VKNews>() {
         @Override
         public void onCompleted() {
-
+            loadCache();
         }
 
         @Override
@@ -53,56 +54,29 @@ public class NewsPresenter implements INewsPresenter {
         }
 
         @Override
-        public void onNext(VKNews item) {
-            view.onItem(item);
+        public void onNext(VKNews vkNews) {
+            addToCache(vkNews);
         }
     };
 
-    public NewsPresenter(FragmentActivity activity, IView<VKNews> view) {
-        this.activity = activity;
-        this.fragment = activity.getSupportFragmentManager().findFragmentByTag(Const.FRAGMENT);
-        this.view = view;
+    private void addToCache(VKNews vkNews) {
+        cache.put(pos, vkNews);
+        pos++;
     }
 
-    public NewsPresenter(Fragment fragment, IView<VKNews> view) {
-        this.activity = fragment.getActivity();
-        this.fragment = fragment;
-        this.view = view;
-    }
-
-    public NewsPresenter(Fragment fragment) {
-        this.activity = fragment.getActivity();
-        this.fragment = fragment;
-    }
-
-    private void showError(String error) {
-        if (error == null)
-            DialogsBuilder.createAlert(activity, "End reached").show();
-        else
-            DialogsBuilder.createAlert(activity, error).show();
-    }
-
-    @Override
-    public void getNews(String from) {
-        VKParameters params = new VKParameters();
-        params.put("filters", "post");
-        if (from != null) {
-            params.put("start_from", from);
-        }
-        params.put(VKApiConst.COUNT, 15);
-        VkApiPlus.news().getNews(params).executeWithListener(new VKRequest.VKRequestListener() {
-            @Override
-            public void onComplete(VKResponse response) {
-                super.onComplete(response);
-                register(fillNews(response));
+    private void loadCache() {
+        if ((cache.size()-prev_pos)>0)
+            for (int i = prev_pos; i < pos; i++) {
+                view.onItem(cache.get(i));
             }
+        prev_pos = pos;
+    }
 
-            @Override
-            public void onError(VKError error) {
-                super.onError(error);
-                showError(error.errorMessage);
-            }
-        });
+    public CacheTest(IView<VKNews> view, Fragment fragment) {
+        this.view = view;
+        this.cache = new LruCache<>(1024);
+        this.fragment = fragment;
+        this.activity = fragment.getActivity();
     }
 
     private Observable<VKNews> fillNews(final VKResponse response) {
@@ -144,6 +118,54 @@ public class NewsPresenter implements INewsPresenter {
         } else {
             AppObservable.bindActivity(activity, observable).subscribeOn(Schedulers.io()).subscribe(observer);
         }
+    }
+
+    @Override
+    public void getNews(final String from) {
+        register(getVkNewsObservable(from));
+    }
+
+    @NonNull
+    private Observable<VKNews> getVkNewsObservable(final String from) {
+        return Observable.create(new Observable.OnSubscribe<VKResponse>() {
+            @Override
+            public void call(final Subscriber<? super VKResponse> subscriber) {
+                VKParameters params = new VKParameters();
+                params.put("filters", "post");
+                if (from != null) {
+                    params.put("start_from", from);
+                } else {
+                    cache.evictAll();
+                }
+                params.put(VKApiConst.COUNT, 15);
+                VkApiPlus.news().getNews(params).executeWithListener(new VKRequest.VKRequestListener() {
+                    @Override
+                    public void onComplete(VKResponse response) {
+                        super.onComplete(response);
+                        subscriber.onNext(response);
+                        subscriber.onCompleted();
+                    }
+
+                    @Override
+                    public void onError(VKError error) {
+                        super.onError(error);
+                        subscriber.onError(new Exception(error.errorMessage, error.httpError));
+                    }
+                });
+            }
+        }).flatMap(new Func1<VKResponse, Observable<VKNews>>() {
+            @Override
+            public Observable<VKNews> call(VKResponse response) {
+                return fillNews(response);
+            }
+        });
+    }
+
+    private void showError(String error) {
+        if (error == null)
+            DialogsBuilder.createAlert(activity, "End reached").show();
+        else
+            DialogsBuilder.createAlert(activity, error).show();
     }
 
     @Override
